@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en" data-theme="day">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#7692FF">
+<title>Azure Connect</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app" data-tab="world" data-role="piyu">
+  <div id="sky"><canvas class="stars"></canvas></div>
+
+  <main id="screens">
+    <section class="screen" id="s-world"></section>
+    <section class="screen" id="s-space"></section>
+    <section class="screen" id="s-us"></section>
+    <section class="screen" id="s-mem"></section>
+    <section class="screen" id="s-set"></section>
+  </main>
+
+  <nav id="nav">
+    <button data-tab="world" aria-label="World">
+      <svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg><span id="nav-world">World</span></button>
+    <button data-tab="space" data-only="piyu" aria-label="My Space">
+      <svg viewBox="0 0 24 24"><path d="M7 18a4 4 0 0 1-.6-7.95A5.5 5.5 0 0 1 17 9.5a4.2 4.2 0 0 1 .5 8.5z"/></svg><span>My Space</span></button>
+    <button data-tab="us" aria-label="Us">
+      <svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.600-7 10-7 10z"/></svg><span>Us</span></button>
+    <button data-tab="mem" aria-label="Memories">
+      <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="m4 17 5-4 4 3 3-2 4 3"/></svg><span>Memories</span></button>
+    <button data-tab="set" aria-label="Settings">
+      <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg><span>Settings</span></button>
+  </nav>
+
+  <div id="scrim"></div>
+  <div id="sheet"></div>
+  <div id="modal"></div>
+  <div id="toast"></div>
+
+  <div id="welcome"></div>
+
+  <div id="sleep">
+    <div class="sleep-sky"></div>
+    <canvas class="stars"></canvas>
+    <div class="sleep-moon"></div>
+    <div class="sleep-cloud fog c1"></div><div class="sleep-cloud fog c2"></div>
+    <div class="sleep-text">
+      <p class="l l0 big">Time to rest.</p>
+      <p class="l l1">You are loved.<br>You are important.<br>You don't have to figure everything out tonight.</p>
+      <p class="l l2">Tomorrow is another page.</p>
+      <p class="l l3 hand">Goodnight, Piyu.</p>
+      <button class="soft-btn l l4" id="sleep-close">Goodnight</button>
+    </div>
+  </div>
+
+  <div id="splash">
+    <canvas class="stars"></canvas>
+    <div class="splash-a"><h1>AZURE CONNECT</h1></div>
+    <div class="splash-b">
+      <div class="splash-moon"></div>
+      <div class="splash-cloud fog sc1"></div><div class="splash-cloud fog sc2"></div>
+      <h2>PIYU'S WORLD</h2>
+      <p>Your little corner of the universe.</p>
+    </div>
+  </div>
+</div>
+<script src="firebase-config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
