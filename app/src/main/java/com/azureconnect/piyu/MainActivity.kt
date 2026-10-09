@@ -46,7 +46,7 @@ class MainActivity : Activity() {
             setBackgroundColor(midnight)
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
-            settings.allowFileAccess = false
+            settings.allowFileAccess = true
             addJavascriptInterface(Bridge(), "Android")
             webViewClient = object : WebViewClient() {
                 override fun shouldInterceptRequest(v: WebView, r: WebResourceRequest): WebResourceResponse? =

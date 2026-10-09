@@ -118,17 +118,24 @@ const pickFile = accept => new Promise(res => {
   i.onchange = () => { res(i.files[0] || null); setTimeout(() => i.remove(), 60000); };
   i.click();
 });
-function shrink(file, max = 900) {
-  return new Promise((res, rej) => {
-    const u = URL.createObjectURL(file), im = new Image();
-    im.onload = () => {
-      const k = Math.min(1, max / Math.max(im.width, im.height)), c = document.createElement('canvas'); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
-      c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(u);
-      c.toBlob(b => b.size > MAX_INLINE ? c.toBlob(b2 => res(b2), 'image/jpeg', .5) : res(b), 'image/jpeg', .74);
-    };
-    im.onerror = () => rej(new Error("decode"));
-    im.src = u;
-  });
+async function shrink(file, max = 900) {
+  // Try three ways to decode, because Android's web view is picky about picked files.
+  let src, w, h, why = '';
+  try { src = await createImageBitmap(file); w = src.width; h = src.height; }
+  catch (e1) {
+    why = 'bitmap:' + (e1 && e1.name);
+    try {
+      const url = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error || new Error('read')); r.readAsDataURL(file); });
+      src = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('decode')); im.src = url; });
+      w = src.naturalWidth; h = src.naturalHeight;
+    } catch (e2) { throw new Error(why + ' / ' + (e2 && e2.message)); }
+  }
+  const k = Math.min(1, max / Math.max(w, h)), c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(h * k));
+  c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
+  const blob = q => new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error('encode')), 'image/jpeg', q));
+  let b = await blob(.74); if (b.size > MAX_INLINE) b = await blob(.5);
+  return b;
 }
 async function dataFor(o) { // small media travels inside the synced document; big files stay on this phone
   const src = mediaSrc(o); if (!src) return null;
@@ -214,7 +221,7 @@ const dayNum = () => Math.floor((Date.now() - new Date().getTimezoneOffset() * 6
 const timeStr = t => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 const dateStr = t => new Date(t).toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' });
 function dayLabel(t) { const k = dayKey(t); if (k === dayKey()) return 'Today'; if (k === dayKey(Date.now() - 864e5)) return 'Yesterday'; return new Date(t).toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' }); }
-let toastT; function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 3000); }
+let toastT; function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("on"), 5500); }
 function applyCalm() { document.body.classList.toggle('calm', !!S.settings.calm); }
 function applyTheme() {
   const night = S.settings.theme === 'night';
@@ -324,7 +331,7 @@ let C = null;
 /* ---------- shared bits for composing ---------- */
 const SONG_FIELDS = o => `<input class="field" placeholder="Song title" value="${esc(o.title || '')}" oninput="C.title=this.value"><input class="field" placeholder="Artist (optional)" value="${esc(o.artist || '')}" oninput="C.artist=this.value"><input class="field" placeholder="Paste a Spotify / YouTube / Apple Music link" value="${esc(o.link || '')}" oninput="C.link=this.value"><button class="soft-btn ghost" style="width:100%;margin-top:12px" onclick="pickSong()">Or pick an audio file from this phone</button>${o.fileName ? `<div class="file-chip">♪ ${esc(o.fileName)}</div><p class="note">Files stay on this phone. A link is what travels to the other person.</p>` : ''}`;
 window.pickSong = async () => { const f = await pickFile('audio/*'); if (!f) return; C.blob = f; C.fileName = f.name; if (!C.title) C.title = f.name.replace(/\.[^.]+$/, ''); redraw(); };
-window.pickPhoto = async () => { const f = await pickFile('image/*'); if (!f) return; toast('Adding photo…'); try { C.blob = await shrink(f); C.preview = URL.createObjectURL(C.blob); redraw(); } catch (e) { toast("Couldn't read that photo. Try a different one."); } };
+window.pickPhoto = async () => { const f = await pickFile('image/*'); if (!f) return; toast('Adding photo…'); try { C.blob = await shrink(f); C.preview = URL.createObjectURL(C.blob); redraw(); } catch (e) { toast("Couldn't read that photo (" + (f.type || 'unknown type') + ', ' + f.size + ' bytes: ' + (e && e.message) + ')'); } };
 let redraw = () => {};
 let rec, recStream;
 window.toggleRec = async () => {
