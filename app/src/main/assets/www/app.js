@@ -109,17 +109,24 @@ const IDB = {
     return new Promise(res => { if (!IDB.db) return res(); const q = IDB.db.transaction('m').objectStore('m').openCursor(); q.onsuccess = () => { const c = q.result; if (c) { IDB.urls[c.key] = URL.createObjectURL(c.value); c.continue(); } else res(); }; q.onerror = () => res(); });
   },
 };
-const mediaSrc = o => (o && (o.data || (o.mediaId && IDB.urls[o.mediaId]))) || '';
+const mediaSrc = o => (o && (o.data || o.src || (o.mediaId && IDB.urls[o.mediaId]))) || '';
 const blobToData = b => new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(b); });
-const pickFile = accept => new Promise(res => { const i = document.createElement('input'); i.type = 'file'; i.accept = accept; i.onchange = () => res(i.files[0] || null); i.click(); });
+const pickFile = accept => new Promise(res => {
+  // the input must live in the page: Android's WebView can drop change events from detached inputs
+  const i = document.createElement('input'); i.type = 'file'; i.accept = accept; i.style.cssText = 'position:fixed;left:-9999px;opacity:0';
+  document.body.appendChild(i);
+  i.onchange = () => { res(i.files[0] || null); setTimeout(() => i.remove(), 60000); };
+  i.click();
+});
 function shrink(file, max = 900) {
-  return new Promise(res => {
+  return new Promise((res, rej) => {
     const u = URL.createObjectURL(file), im = new Image();
     im.onload = () => {
       const k = Math.min(1, max / Math.max(im.width, im.height)), c = document.createElement('canvas'); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
       c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(u);
       c.toBlob(b => b.size > MAX_INLINE ? c.toBlob(b2 => res(b2), 'image/jpeg', .5) : res(b), 'image/jpeg', .74);
     };
+    im.onerror = () => rej(new Error("decode"));
     im.src = u;
   });
 }
@@ -224,6 +231,11 @@ function starPos(i) {
   const n = i - pts.length, a = n * 2.399963, rad = 30 + Math.sqrt(n) * 17;
   return { x: Math.round(150 + Math.cos(a) * rad * 1.45), y: Math.round(135 + Math.sin(a) * rad * .95), r: 1.3 + (n % 4) * .4 };
 }
+const bundled = () => (window.BUNDLED_PHOTOS || []).map((p, i) => ({ id: 'pre' + i, col: 'Our Photos', mkind: p.video ? 'video' : 'photo', src: p.file, cap: p.cap || '', t: p.date ? new Date(p.date).getTime() : new Date('2026-10-01').getTime() - i * 1000, seedOrder: i }));
+const photosHTML = () => {
+  const b = bundled(); if (!b.length) return '';
+  return `<div class="sec">Our photos</div><div class="board" style="margin-top:18px">${b.map((m, i) => `<button class="mem" style="--r:${(i % 2 ? 2 : -2) + (i % 3) * .5}deg;--t:${7 + i % 4}s;--dl:-${i * 1.3}s;--tc:${COL_COLORS[i % COL_COLORS.length]}" onclick="openMem('${m.id}')"><div class="polaroid">${m.mkind === 'video' ? `<video src="${esc(m.src)}#t=0.1" muted playsinline preload="metadata" style="width:100%;aspect-ratio:1/1;object-fit:cover;display:block"></video>` : `<img src="${esc(m.src)}" alt="">`}<div class="cap">${esc(m.cap)}</div></div></button>`).join('')}</div>`;
+};
 const starCount = () => 14 + S.events + items().length;
 const addEvent = () => { S.events++; newStar = true; };
 
@@ -312,7 +324,7 @@ let C = null;
 /* ---------- shared bits for composing ---------- */
 const SONG_FIELDS = o => `<input class="field" placeholder="Song title" value="${esc(o.title || '')}" oninput="C.title=this.value"><input class="field" placeholder="Artist (optional)" value="${esc(o.artist || '')}" oninput="C.artist=this.value"><input class="field" placeholder="Paste a Spotify / YouTube / Apple Music link" value="${esc(o.link || '')}" oninput="C.link=this.value"><button class="soft-btn ghost" style="width:100%;margin-top:12px" onclick="pickSong()">Or pick an audio file from this phone</button>${o.fileName ? `<div class="file-chip">♪ ${esc(o.fileName)}</div><p class="note">Files stay on this phone. A link is what travels to the other person.</p>` : ''}`;
 window.pickSong = async () => { const f = await pickFile('audio/*'); if (!f) return; C.blob = f; C.fileName = f.name; if (!C.title) C.title = f.name.replace(/\.[^.]+$/, ''); redraw(); };
-window.pickPhoto = async () => { const f = await pickFile('image/*'); if (!f) return; C.blob = await shrink(f); C.preview = URL.createObjectURL(C.blob); redraw(); };
+window.pickPhoto = async () => { const f = await pickFile('image/*'); if (!f) return; toast('Adding photo…'); try { C.blob = await shrink(f); C.preview = URL.createObjectURL(C.blob); redraw(); } catch (e) { toast("Couldn't read that photo. Try a different one."); } };
 let redraw = () => {};
 let rec, recStream;
 window.toggleRec = async () => {
@@ -432,13 +444,13 @@ function renderUs() {
   const mine = items().filter(i => i.from === 'piyu' && (i.kind === 'need' || i.kind === 'entry')).slice().reverse();
   const hugs = items().filter(i => i.kind === 'hug').slice().reverse();
   if (S.role === 'friend') {
-    $('#s-us').innerHTML = `<div class="title">Us</div><div class="hello">Our little universe is growing.</div>${constellationHTML()}
+    $('#s-us').innerHTML = `<div class="title">Us</div><div class="hello">Our little universe is growing.</div>${constellationHTML()}${photosHTML()}
      <div class="sec">From Piyu</div>
      ${mine.map(i => bubble(i, i.kind === 'need' ? '#FFC2D9' : '#D2C6FF', 'Piyu') + (i.kind === 'need' ? `<button class="chip" style="margin-top:8px;--c:var(--mint)" onclick="imHere()">I'm here</button>` : !i.noReply ? `<button class="chip" style="margin-top:8px;--c:var(--pink)" onclick="imHere()">💙 Send a hug back</button>` : '')).join('') || `<div class="empty" style="font-size:24px">${STICKERS.cloud}Nothing yet. When Piyu reaches out, it shows up here.</div>`}`;
     return;
   }
   const priv = S.entries.filter(e => !e.shared).length;
-  $('#s-us').innerHTML = `<div class="title">Us</div><div class="hello">Our little universe is growing.</div>${constellationHTML()}
+  $('#s-us').innerHTML = `<div class="title">Us</div><div class="hello">Our little universe is growing.</div>${constellationHTML()}${photosHTML()}
    ${hugs.length ? `<div class="sec">From ${esc(them())}</div>${hugs.slice(0, 2).map(i => bubble(i, '#B5EBD3', S.friendName || 'They')).join('')}` : ''}
    <div class="sec">What ${esc(S.friendName || 'they')} can see</div>
    ${mine.map(i => bubble(i, i.kind === 'need' ? '#FFC2D9' : '#D2C6FF', 'Piyu')).join('') || '<p class="note" style="margin:6px 2px">Nothing yet. Only what you choose to send shows up.</p>'}
@@ -479,9 +491,10 @@ window.sendSurprise = async () => {
 let colSel = 'All';
 function allMemories() {
   const shared = items().filter(i => i.kind === 'memory'), ids = new Set(shared.map(i => i.id));
-  return seedMem().concat(S.mine.filter(m => !ids.has(m.id)), shared);
+  return seedMem().concat(bundled(), S.mine.filter(m => !ids.has(m.id)), shared);
 }
 function memThumb(m) {
+  if (m.mkind === 'video') return `<video src="${esc(m.src)}#t=0.1" muted playsinline preload="metadata" style="width:100%;aspect-ratio:1/1;object-fit:cover;display:block"></video>`;
   if (m.mkind === 'letter') return `<div class="letterpaper">${esc(m.letter)}</div>`;
   if (m.mkind === 'song') return `<div class="songtile"><img src="${art('song')}" alt=""></div>`;
   return `<img src="${mediaSrc(m) || (m.art ? art(m.art) : '')}" alt="">`;
@@ -497,8 +510,8 @@ function renderMem() {
   document.querySelectorAll('#s-mem .mem').forEach(b => b.onclick = () => openMem(b.dataset.id));
 }
 function openMem(id) {
-  const m = allMemories().find(x => x.id === id); if (!m) return;
-  const body = m.mkind === 'letter' ? `<div class="letterpaper" style="aspect-ratio:auto;font-size:24px;padding:18px;min-height:240px">${esc(m.letter)}</div>`
+  const m = allMemories().concat(bundled()).find(x => x.id === id); if (!m) return;
+  const body = m.mkind === 'video' ? `<video src="${esc(m.src)}" controls playsinline style="width:100%;display:block;background:#000"></video>` : m.mkind === 'letter' ? `<div class="letterpaper" style="aspect-ratio:auto;font-size:24px;padding:18px;min-height:240px">${esc(m.letter)}</div>`
     : m.mkind === 'song' ? `<div style="text-align:center;padding:6px 0 10px">${songBlock(m)}</div>` : `<img src="${mediaSrc(m) || (m.art ? art(m.art) : '')}" alt="">`;
   $('#modal').innerHTML = `<button class="x" onclick="closeModal()">✕</button><div class="big-memory"><div class="sheet-t" style="text-align:center;font-size:42px;margin-top:22px">Remember this?</div>
    <div class="polaroid">${body}<div class="cap">${esc(m.cap)}</div></div></div>
