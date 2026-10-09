@@ -39,7 +39,7 @@ class MainActivity : Activity() {
         // Serve bundled assets from a real https origin so localStorage and getUserMedia behave.
         val assets = WebViewAssetLoader.Builder()
             .setDomain("appassets.androidplatform.net")
-            .addPathHandler("/www/", WebViewAssetLoader.AssetsPathHandler(this))
+            .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
             .build()
 
         web = WebView(this).apply {
@@ -94,7 +94,7 @@ class MainActivity : Activity() {
         ) requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQ_NOTIF)
 
         sleepFromNotification = intent?.getBooleanExtra(EXTRA_SLEEP, false) == true
-        web.loadUrl("https://appassets.androidplatform.net/www/index.html")
+        web.loadUrl("https://appassets.androidplatform.net/assets/www/index.html")
     }
 
     override fun onNewIntent(intent: Intent) {
